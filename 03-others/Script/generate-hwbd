@@ -1,0 +1,81 @@
+#!/bin/bash
+
+set -euo pipefail
+
+OUT="/etc/udev/hwdb.d/99-auto-generated.hwdb"
+TMP="$(mktemp)"
+
+echo "# 99-auto-generated.hwdb — hasil generate otomatis" > "$TMP"
+echo "# Dibuat: $(date -Iseconds)" >> "$TMP"
+echo "# Edit jika perlu untuk menyesuaikan properti." >> "$TMP"
+echo >> "$TMP"
+
+# DMI (identitas mesin)
+if [ -f /sys/class/dmi/id/modalias ]; then
+    mi=$(cat /sys/class/dmi/id/modalias)
+    vendor=$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null || echo unknown)
+    product=$(cat /sys/class/dmi/id/product_name 2>/dev/null || echo unknown)
+    echo "$mi:" >> "$TMP"
+    echo "  ID_BUS=dmi" >> "$TMP"
+    echo "  ID_VENDOR_FROM_DATABASE=$vendor" >> "$TMP"
+    echo "  ID_MODEL_FROM_DATABASE=$product" >> "$TMP"
+    echo >> "$TMP"
+fi
+
+# Semua modalias perangkat unik
+find /sys -type f -name modalias -print0 \
+  | xargs -0 cat \
+  | sort -u \
+  | while read -r m; do
+      case "$m" in
+        usb:*)
+          echo "$m:" >> "$TMP"
+          echo "  ID_BUS=usb" >> "$TMP"
+          echo "  ID_MODEL_FROM_DATABASE=Unknown USB Device" >> "$TMP"
+          ;;
+        pci:*)
+          echo "$m:" >> "$TMP"
+          echo "  ID_BUS=pci" >> "$TMP"
+          echo "  ID_MODEL_FROM_DATABASE=Unknown PCI Device" >> "$TMP"
+          ;;
+        acpi:*)
+          echo "$m:" >> "$TMP"
+          echo "  ID_BUS=acpi" >> "$TMP"
+          echo "  ID_MODEL_FROM_DATABASE=Unknown ACPI Device" >> "$TMP"
+          ;;
+        platform:*)
+          echo "$m:" >> "$TMP"
+          echo "  ID_BUS=platform" >> "$TMP"
+          echo "  ID_MODEL_FROM_DATABASE=Unknown Platform Device" >> "$TMP"
+          ;;
+        hid:*)
+          echo "$m:" >> "$TMP"
+          echo "  ID_BUS=hid" >> "$TMP"
+          echo "  ID_MODEL_FROM_DATABASE=Unknown HID Device" >> "$TMP"
+          ;;
+        serio:*)
+          echo "$m:" >> "$TMP"
+          echo "  ID_BUS=serio" >> "$TMP"
+          echo "  ID_MODEL_FROM_DATABASE=Unknown Serial IO Device" >> "$TMP"
+          ;;
+        *)
+          echo "$m:" >> "$TMP"
+          echo "  ID_MODEL_FROM_DATABASE=Unknown Device" >> "$TMP"
+          ;;
+      esac
+      echo >> "$TMP"
+    done
+
+mkdir -p "$(dirname "$OUT")"
+mv "$TMP" "$OUT"
+
+# Kompilasi/update hwdb
+#if command -v systemd-hwdb >/dev/null 2>&1; then
+# systemd-hwdb update
+#else
+#  udevadm hwdb --update
+#fi
+
+#udevadm trigger
+
+echo "✅ Selesai! File hwdb otomatis: $OUT"

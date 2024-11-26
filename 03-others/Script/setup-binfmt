@@ -1,0 +1,24 @@
+#!/bin/bash
+
+if [ $(id --user) -ne 0 ]; then
+	echo "Please run as root !!!"
+	exit 1
+fi
+
+. /etc/os-release
+
+_packages=qemu-user-static
+if [ $VERSION_ID  -gt 12 ]; then
+  _packages=qemu-user-binfmt
+fi
+
+apt install --no-install-recommends --no-install-suggests $_packages
+
+_services=(
+  proc-sys-fs-binfmt_misc.automount
+  proc-sys-fs-binfmt_misc.mount
+  systemd-binfmt.service
+)
+systemctl unmask  "${_services[@]}"
+systemctl restart "${_services[@]}"
+systemctl status  "${_services[@]}"

@@ -1,0 +1,11 @@
+#!/bin/sh
+
+apt install --no-install-suggests --no-install-recommends docker.io docker-cli ca-certificates
+
+tee /etc/docker/daemon.json << EOF
+{
+	"iptables": false
+}
+EOF
+
+systemctl restart docker.service
