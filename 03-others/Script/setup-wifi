@@ -1,0 +1,16 @@
+#!/bin/bash
+
+if [ $(id -u 2>/dev/null) -ne 0 ]; then
+	echo "Please running as root ...!!!"
+	exit 127
+fi
+
+/usr/sbin/modprobe -v brcmsmac || exit $?
+
+packages=(
+	"$([ ! -f /lib/firmware/brcm/bcm43xx-0.fw ] || [ ! -f /lib/firmware/brcm/bcm43xx_hdr-0.fw ] && echo firmware-brcm80211)"
+	"$([ ! -f /lib/firmware/regulatory.db ] && echo wireless-regdb)"
+	wpasupplicant
+)
+
+apt-get install --no-install-recommends --no-install-suggests ${packages[@]} || exit $?

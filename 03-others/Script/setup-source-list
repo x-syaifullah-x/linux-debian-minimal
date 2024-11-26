@@ -1,0 +1,15 @@
+#!/bin/sh
+
+_USER_ID=$(id -u 2>/dev/null || echo -1)
+if [  $_USER_ID -ne 0 ]; then
+	echo "Please running as root ...!!!"
+	exit 1
+fi
+
+. /etc/os-release
+
+tee /etc/apt/sources.list <<EOF
+deb [trusted=yes lang=none] file:/home/xxx/.files/Repo/DEB 	$VERSION_CODENAME/
+EOF
+
+apt update

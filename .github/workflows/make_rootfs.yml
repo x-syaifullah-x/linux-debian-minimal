@@ -1,0 +1,104 @@
+name: base_system
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  base_system:
+    permissions: write-all
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        arch:
+          - amd64
+          - arm64
+        codename:
+          - bookworm
+          - trixie
+        rootfs_type:
+          # INCLUDE: APT || EXCLUDE: -
+          - base
+          # INCLUDE: APT || EXCLUDE: MAN | DOC | INFO | LINTIAN
+          - base_slim
+          # INCLUDE: - || EXCLUDE: APT
+          - base_no-apt
+          # INCLUDE: - || EXCLUDE: APT | MAN | DOC | INFO | LINTIAN
+          - base_no-apt_slim
+
+    env:
+      DEBIAN_FRONTEND : noninteractive
+      GITHUB_TOKEN    : ${{ secrets.GITHUB_TOKEN }}
+      ROOTFS_DIR      : ${{ github.workspace }}/rootfs
+      ARCH            : ${{ matrix.arch }}
+      CODENAME        : ${{ matrix.codename }}
+      ROOTFS_TYPE     : ${{ matrix.rootfs_type }}
+      RESULT_XZ       : ${{ github.workspace }}/${{ matrix.codename }}_${{ matrix.arch }}_${{ matrix.rootfs_type }}.tar.xz
+
+    steps:
+      - name: CHECKOUT
+        uses: actions/checkout@v4
+
+      - name: MAKE ROOTFS
+        run: |
+          _DOCKER_IMAGE="debian:$CODENAME"
+          _DOCKER_PLATFORM="linux/$ARCH"
+          _ARCH_HOST=$(dpkg --print-architecture)
+          if [ "$_ARCH_HOST" != "$ARCH" ]; then
+            sudo apt update
+            sudo apt install --no-install-suggests --no-install-recommends qemu-user-static -y 2>&1 >/dev/null
+            docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+          fi
+          docker pull --platform $_DOCKER_PLATFORM $_DOCKER_IMAGE
+          _CONTAINER_NAME="x-container-${CODENAME}"
+          mkdir -pv $ROOTFS_DIR
+          ROOTFS_DIR_NAME=$(basename $ROOTFS_DIR)
+          docker create --name "$_CONTAINER_NAME" --privileged -e "DEBIAN_FRONTEND=noninteractive" -v "${{ github.workspace }}:/x" -v "$ROOTFS_DIR:/$ROOTFS_DIR_NAME" --entrypoint "tail" --platform "$_DOCKER_PLATFORM" "$_DOCKER_IMAGE" -f /dev/null
+          docker start $_CONTAINER_NAME
+          docker exec $_CONTAINER_NAME apt-get update 2>&1 >/dev/null
+          docker exec $_CONTAINER_NAME apt-get upgrade --no-install-suggests --no-install-recommends -y 2>&1 >/dev/null
+
+          _ARGS="--rootfs-dir $ROOTFS_DIR_NAME"
+
+          if [ "$ROOTFS_TYPE" = "base_slim" ]; then
+            _ARGS="$_ARGS --without-man --without-doc --without-info --without-lintian"
+          fi
+
+          if [ "$ROOTFS_TYPE" = "base_no-apt" ]; then
+            _ARGS="$_ARGS --without-apt"
+          fi
+
+          if [ "$ROOTFS_TYPE" = "base_no-apt_slim" ]; then
+            _ARGS="$_ARGS --without-apt --without-man --without-doc --without-info --without-lintian"
+          fi
+
+          _DIR_SCRIPT="/x/00-scripts/rootfs"
+          if [ $CODENAME = bookworm ]; then
+            _MAKE_ROOTFS_SCRIPT="$_DIR_SCRIPT/make_rootfs_bookworm.sh"
+          elif [ $CODENAME = trixie ]; then
+            _MAKE_ROOTFS_SCRIPT="$_DIR_SCRIPT/make_rootfs_trixie.sh"
+          else
+            exit 127
+          fi
+
+          docker exec $_CONTAINER_NAME chmod +x $_MAKE_ROOTFS_SCRIPT
+          docker exec $_CONTAINER_NAME $_MAKE_ROOTFS_SCRIPT $_ARGS
+
+          # docker exec $_CONTAINER_NAME apt-get install --no-install-suggests --no-install-recommends apt-utils debootstrap gzip -y 2>&1 >/dev/null
+          # export INCLUDE_PACKAGE="apt-utils,bash-completion"
+          # export EXCLUDE_PACKAGE="e2fsprogs,sysvinit-utils"
+          # docker exec $_CONTAINER_NAME debootstrap --variant=minbase --arch $ARCH --exclude=$EXCLUDE_PACKAGE --include=$INCLUDE_PACKAGE $CODENAME /$ROOTFS_DIR_NAME http://deb.debian.org/debian
+
+      - name: MAKE ARTIFACT
+        run: |
+          if [ -n "$RESULT_XZ" ]; then
+            sudo apt install --no-install-recommends --no-install-suggests xz-utils -y
+            cd "$ROOTFS_DIR" && sudo tar --use-compress-program='xz -9' -cf "$RESULT_XZ" *
+          fi
+
+      - name: UPLOAD ARTIFACT
+        run: |
+          gh release create v1.0.0 --title "ROOTFS DEBIAN" --latest=false || true
+          if [ -n "$RESULT_XZ" ]; then
+            gh release upload v1.0.0 "$RESULT_XZ" --clobber
+          fi

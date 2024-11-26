@@ -1,0 +1,51 @@
+#!~/.bash_login
+
+#[ $TERM = linux ] && setterm -blank 3
+
+export DEBIAN_FRONTEND=teletype
+
+PATH="$PATH:$HOME/.local/bin"
+
+_TMP="$HOME/.files"
+_P_FILES_IDE="$_TMP/IDE"
+_P_FILES_SDK="$_TMP/SDK"
+_P_FILES_TOOLS="$_TMP/Tools"
+
+_TMP="$_P_FILES_SDK/Flutter/Default"
+PATH="$PATH:$_TMP/bin"
+
+_TMP="$_P_FILES_SDK/Go/Default"
+PATH="$PATH:$_TMP/bin"
+
+_TMP="$_P_FILES_SDK/Node/Default"
+PATH="$PATH:$_TMP/bin"
+
+export JAVA_HOME="$_P_FILES_SDK/Java/Default"
+PATH="$PATH:$JAVA_HOME/bin"
+
+export ANDROID_HOME="$_P_FILES_SDK/Android"
+PATH="$PATH:$ANDROID_HOME/cmake/Default/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools"
+
+_TMP="$_P_FILES_IDE/android-studio"
+PATH="$PATH:$_TMP/bin"
+
+_TMP="$_P_FILES_TOOLS/Firebase/Default"
+# [ ! -L $HOME/.cache/firebase ] && ln -s $FIREBASE_TOOLS_ROOT/firebase $HOME/.cache 2>/dev/null
+PATH="$PATH:$_TMP/node_modules/.bin"
+
+export PATH
+
+unset _P_FILES_IDE
+unset _P_FILES_SDK
+unset _P_FILES_TOOLS
+
+[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"
+
+[ -z $DBUS_SESSION_BUS_ADDRESS ] && export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$UID/bus
+
+_TMP="${HOME}/.android/studio/bin"
+_TMP="STUDIO_PROPERTIES=$_TMP/idea.properties STUDIO_VM_OPTIONS=$_TMP/studio64.vmoptions LIBVA_DRIVER_NAME=i965 VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/intel_hasvk_icd.json ELECTRON_OZONE_PLATFORM_HINT=wayland MOZ_ENABLE_WAYLAND=1 QT_QPA_PLATFORM=wayland $([ -z "$XDG_DATA_DIRS" ] && XDG_DATA_DIRS=/usr/share/gnome:/usr/local/share/:/usr/share/:${HOME}/.local/share/) XDG_SESSION_TYPE=wayland"
+alias gnome-session="$_TMP exec dbus-run-session -- gnome-session"
+alias sway="GTK_THEME=Adwaita:dark $_TMP exec sway"
+
+unset _TMP
