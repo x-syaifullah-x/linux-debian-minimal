@@ -1,0 +1,31 @@
+#!/bin/sh
+
+if [ $(id --user) != 0 ]; then
+	echo "Please run as root !!!"
+	exit 127
+fi
+
+DISTRIBUTION="$1"
+CURRENT_DIR="/$(realpath --relative-to=/ $(dirname $0))"
+FILE_BACKUP="${CURRENT_DIR}/$DISTRIBUTION.tar"
+
+[ -z "$DISTRIBUTION" ] && echo "Usage: $(basename $0) <bookworm | trixie | any> <backup | restore>" && exit 1
+
+OPT=$2
+
+case "$OPT" in
+	backup)
+		tar -cvf $FILE_BACKUP "/etc/apt/sources.list" "/var/lib/apt"
+	;;
+	restore)
+		if [ -f "$FILE_BACKUP" ]; then
+			tar xvf "$FILE_BACKUP" --directory="/" || exit $?
+			apt update
+		else
+			echo "Can't find file $FILE_BACKUP"
+		fi
+	;;
+	*)
+	echo "Usage: $(basename $0) $DISTRIBUTION <backup | restore>"
+	;;
+esac

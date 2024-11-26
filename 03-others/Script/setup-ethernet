@@ -1,0 +1,24 @@
+#!/bin/bash
+
+if [ $(id -u 2>/dev/null) -ne 0 ]; then
+	echo "Please running as root ...!!!"
+	exit 127
+fi
+
+packages=(
+	"$([ ! -f /lib/firmware/rtl_nic/rtl8168e-3.fw ] && echo firmware-realtek)"
+	"$([ ! -f /lib/firmware/regulatory.db ] && echo wireless-regdb)"
+)
+
+if [ ${#a[@]} -ne 0 ]; then
+	apt-get install --no-install-recommends --no-install-suggests ${packages[@]} || exit $?
+fi
+
+/sbin/modprobe -v r8169 || exit $?
+
+tee /etc/resolv.conf << EOF
+nameserver 8.8.8.8
+nameserver 8.8.4.4
+EOF
+
+systemctl restart systemd-networkd

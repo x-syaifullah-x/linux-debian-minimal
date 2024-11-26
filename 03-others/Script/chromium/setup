@@ -1,0 +1,40 @@
+#!/bin/bash
+
+_VERSION="144.0.7559.96-1~deb13u1"
+
+. /etc/os-release
+if [ "$VERSION_ID" -eq 12 ]; then
+	_VERSION="139.0.7258.66-1~deb12u1"
+fi
+
+_packages=(
+	"chromium=$_VERSION"
+	"chromium-common=$_VERSION"
+	$([ -x /bin/findmnt ] || echo	"util-linux")
+	"mesa-vulkan-drivers"
+	"i965-va-driver libva2 libva-drm2" ### VA-API FOR INTEL
+	"upower"
+)
+
+apt install --no-install-suggests --no-install-recommends ${_packages[@]} || exit $?
+
+tee /etc/chromium.d/x-flags << "EOF"
+export CHROMIUM_FLAGS="\
+$CHROMIUM_FLAGS \
+--start-maximized \
+--show-component-extension-options \
+--gtk-version=4 \
+--enable-native-gpu-memory-buffers \
+--enable-zero-copy \
+--enable-features=ConversionMeasurement,WebGPUService,AcceleratedVideoDecodeLinuxGL,AcceleratedVideoDecodeLinuxZeroCopyGL,AcceleratedVideoEncoder \
+--ozone-platform-hint=auto \
+--enable-parallel-downloading \
+--disable-gpu-driver-bug-workarounds \
+--no-first-run \
+--log-level=3 \
+"
+EOF
+
+CURRENT_DIR="/$(realpath --relative-to=/ $(dirname $0))"
+
+cp -rfvp $CURRENT_DIR/chromium /home/xxx/.config

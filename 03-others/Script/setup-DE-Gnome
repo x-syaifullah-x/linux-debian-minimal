@@ -1,0 +1,69 @@
+#!/bin/bash
+
+if [ $(id -u 2>/dev/null) -eq 0 ]; then
+  echo "Do not run as root!"
+  exit 127
+fi
+
+. /etc/os-release
+
+[[ -x /usr/bin/sudo || $UID -eq 0 ]] || sudo() { su -c "PATH=$PATH:/sbin $(printf '%q ' "$@")"; }
+
+function _install_package {
+	export __packages=$@
+	su -c '
+		#apt-get update 2>&1 >/dev/null || exit $?
+		apt-get install --no-install-recommends --no-install-suggests $__packages || exit $?
+	'
+}
+
+#su -c '
+## FIX dbus-daemon[448]: Unknown username "polkitd" in message bus configuration file
+#grep -qs polkitd /etc/passwd || cat << EOF | tee -a /etc/passwd 2>&1 >/dev/null
+#polkitd:x:991:991:User for polkitd:/:/usr/sbin/nologin
+#EOF
+
+## FIX dbus-daemon[447]: Unknown username "rtkit" in message bus configuration file
+#grep -qs rtkit /etc/passwd || cat << EOF | tee -a /etc/passwd 2>&1 >/dev/null
+#rtkit:x:100:101:RealtimeKit:/proc:/usr/sbin/nologin
+#EOF
+
+## FIX dbus-daemon[447]: Unknown username "colord" in message bus configuration file
+#grep -qs rtkit /etc/passwd || cat << EOF | tee -a /etc/passwd 2>&1 >/dev/null
+#colord:x:101:104:colord colour management daemon:/var/lib/colord:/usr/sbin/nologin
+#EOF
+#'
+
+_packages=(
+	"$([ $VERSION_ID -ge 13 ] && echo bsdutils)"
+	"rtkit"
+	"xdg-desktop-portal"
+)
+
+echo "Install ${_packages[@]}..."
+
+_install_package "${_packages[@]}" || exit $?
+
+[ -f "/usr/libexec/xdg-desktop-portal-gnome" ] || systemctl --user restart xdg-desktop-portal.service
+
+echo "Install gnome-session ..."
+_packages=(
+	"at-spi2-core"
+	"gjs"
+	"gnome-session"
+	"gnome-icon-theme"
+	"gnome-terminal"
+	"ibus"
+	"webp-pixbuf-loader"
+	"x11-utils"
+	"pipewire-libcamera"
+)
+# gnome-session rtkit at-spi2-core gnome-icon-theme gnome-terminal ibus x11-utils pipewire-libcamera
+
+_install_package ${_packages[@]} || exit $?
+
+systemctl --user restart pipewire.socket pipewire-pulse.socket
+
+su -c "/usr/sbin/modprobe -v psmouse"
+
+echo "Install success ..."

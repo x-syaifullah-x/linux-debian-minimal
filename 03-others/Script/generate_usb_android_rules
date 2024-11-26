@@ -1,0 +1,25 @@
+#!/bin/sh
+
+ID_SERIAL_SHORT="$1"
+if [ -z "$ID_SERIAL_SHORT" ]; then
+	echo "Please enter SerialNumber."
+	echo "Can see dmesg | grep SerialNumber"
+	exit 1
+fi
+
+if [ $(id -u 2>/dev/null) -ne 0 ]; then
+	echo "Please running as root ...!!!"
+	exit 127
+fi
+
+RULES_D_DIR="/etc/udev/rules.d"
+if [ ! -d "$RULES_D_DIR" ]; then
+	mkdir -pv $RULES_D_DIR || exit 1
+fi
+
+tee "$RULES_D_DIR/usb_serial_$ID_SERIAL_SHORT.rules" << EOF
+ACTION=="add|change", SUBSYSTEM=="usb", ENV{ID_SERIAL_SHORT}=="$ID_SERIAL_SHORT", MODE="0666", GROUP="plugdev"
+EOF
+
+udevadm control --reload-rules || exit $?
+udevadm trigger --subsystem-match=usb || exit $?
